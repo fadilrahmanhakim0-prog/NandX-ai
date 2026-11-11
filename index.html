@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NandX AI Workspace</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gemini: {
+                            darkBg: '#131314',
+                            sidebar: '#1e1f20',
+                            card: '#1e1f20',
+                            cardHover: '#28292a',
+                            inputBg: '#1e1f20',
+                            border: '#333537',
+                            blue: '#8ab4f8',
+                            purple: '#c4b5fd'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Marked.js & Highlight.js -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <style>
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #444746; border-radius: 3px; }
+
+        pre {
+            background-color: #1e1f20 !important;
+            border: 1px solid #333537;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            overflow-x: auto;
+            margin: 0.75rem 0;
+            position: relative;
+        }
+        code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.875rem;
+        }
+        p { margin-bottom: 0.75rem; }
+        p:last-child { margin-bottom: 0; }
+        ul, ol { margin-left: 1.5rem; margin-bottom: 0.75rem; }
+        ul { list-style-type: disc; }
+        ol { list-style-type: decimal; }
+
+        .copy-code-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #28292a;
+            color: #e3e3e3;
+            border: 1px solid #444746;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .copy-code-btn:hover { background: #3c4043; }
+
+        /* Style untuk tombol hapus riwayat */
+        .history-item:hover .delete-btn {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gemini-darkBg text-slate-100 font-sans h-screen flex overflow-hidden">
+
+    <!-- Sidebar Ala Gemini -->
+    <aside id="sidebar" class="w-64 bg-gemini-sidebar flex flex-col justify-between transition-all duration-300 z-20 border-r border-gemini-border/40">
+        <div class="p-3 flex flex-col gap-4 overflow-y-auto">
+            <div class="flex items-center gap-2">
+                <button onclick="toggleSidebar()" class="p-2.5 hover:bg-gemini-cardHover rounded-full text-slate-300 transition cursor-pointer" title="Ciutkan menu">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+            </div>
+
+            <!-- Tombol Percakapan Baru -->
+            <button onclick="startNewChat()" class="flex items-center gap-3 py-3 px-4 bg-gemini-cardHover hover:bg-[#333537] text-slate-200 font-medium rounded-full transition w-full shadow-sm cursor-pointer text-sm">
+                <svg class="w-5 h-5 text-gemini-blue shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                <span class="sidebar-text truncate">Percakapan Baru</span>
+            </button>
+
+            <!-- Daftar Riwayat Chat -->
+            <div class="mt-4 px-2 sidebar-text">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-slate-400">Riwayat Percakapan</span>
+                    <button onclick="clearAllHistory()" class="text-[11px] text-slate-500 hover:text-red-400 transition cursor-pointer" title="Hapus Semua Riwayat">Hapus Semua</button>
+                </div>
+                <div id="historyList" class="space-y-1">
+                    <!-- Sesi riwayat akan masuk ke sini secara otomatis -->
+                </div>
+            </div>
+        </div>
+
+        <div class="p-4 border-t border-gemini-border/40 flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center font-bold text-sm text-white shrink-0">U</div>
+            <span class="text-sm font-medium text-slate-300 sidebar-text">User</span>
+        </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <main class="flex-1 flex flex-col h-full bg-gemini-darkBg relative overflow-hidden">
+        
+        <!-- Header -->
+        <header class="h-14 flex items-center justify-between px-6 bg-transparent">
+            <div class="flex items-center gap-2 font-medium text-lg text-slate-200">
+                <span>NandX</span>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-gemini-cardHover text-gemini-blue border border-gemini-border">Groq Engine</span>
+            </div>
+        </header>
+
+        <!-- Chat Container / Welcome Screen -->
+        <div id="chatContainer" class="flex-1 overflow-y-auto px-4 sm:px-6 py-4 flex flex-col">
+            
+            <!-- Welcome Banner -->
+            <div id="welcomeScreen" class="my-auto max-w-3xl w-full mx-auto text-center space-y-6">
+                <h1 class="text-4xl sm:text-5xl font-bold tracking-tight bg-gradient-to-r from-[#4285f4] via-[#9b72cb] to-[#d96570] bg-clip-text text-transparent">
+                    Halo, User
+                </h1>
+                <p class="text-3xl sm:text-4xl font-medium text-slate-400">Ada yang bisa NandX bantu hari ini?</p>
+
+                <!-- Kartu Saran Cepat -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-8 text-left">
+                    <div onclick="sendQuickPrompt('Buatkan kode Python script web server sederhana menggunakan Flask')" class="p-4 rounded-2xl bg-gemini-card hover:bg-gemini-cardHover border border-gemini-border/60 transition cursor-pointer flex flex-col justify-between h-32">
+                        <span class="text-sm text-slate-200 font-medium">Buatkan kode Python script web server sederhana menggunakan Flask</span>
+                        <div class="self-end p-2 rounded-full bg-gemini-darkBg text-gemini-blue">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                        </div>
+                    </div>
+                    <div onclick="sendQuickPrompt('Jelaskan konsep dasar Machine Learning dengan bahasa yang santai')" class="p-4 rounded-2xl bg-gemini-card hover:bg-gemini-cardHover border border-gemini-border/60 transition cursor-pointer flex flex-col justify-between h-32">
+                        <span class="text-sm text-slate-200 font-medium">Jelaskan konsep dasar Machine Learning dengan bahasa yang santai</span>
+                        <div class="self-end p-2 rounded-full bg-gemini-darkBg text-purple-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Message List -->
+            <div id="messageList" class="max-w-3xl w-full mx-auto space-y-6 hidden pb-8"></div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 bg-gradient-to-t from-gemini-darkBg via-gemini-darkBg to-transparent">
+            <div class="max-w-3xl mx-auto">
+                <form id="chatForm" class="bg-gemini-inputBg border border-gemini-border rounded-3xl p-3 flex flex-col shadow-lg focus-within:border-slate-500 transition">
+                    <textarea 
+                        id="messageInput" 
+                        rows="1" 
+                        placeholder="Ketik pesan untuk NandX..." 
+                        class="w-full bg-transparent text-slate-100 placeholder-slate-400 px-3 py-1.5 focus:outline-none resize-none text-sm max-h-36"
+                        required></textarea>
+                    
+                    <div class="flex items-center justify-end px-2 pt-2 border-t border-gemini-border/40 mt-2">
+                        <button 
+                            type="submit" 
+                            id="sendBtn"
+                            class="p-2.5 rounded-full bg-slate-200 text-slate-900 hover:bg-white transition disabled:opacity-40 cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+                        </button>
+                    </div>
+                </form>
+                <div class="text-center text-[11px] text-slate-500 mt-2">
+                    NandX dapat menampilkan info yang tidak akurat. Verifikasi respons penting.
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const chatForm = document.getElementById('chatForm');
+        const messageInput = document.getElementById('messageInput');
+        const messageList = document.getElementById('messageList');
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        const sendBtn = document.getElementById('sendBtn');
+        const sidebar = document.getElementById('sidebar');
+        const historyList = document.getElementById('historyList');
+
+        let chatHistory = [];
+        let allSessions = [];
+        let currentSessionId = null;
+        let isGenerating = false;
+        let isSidebarOpen = true;
+
+        function toggleSidebar() {
+            isSidebarOpen = !isSidebarOpen;
+            if (isSidebarOpen) {
+                sidebar.classList.remove('w-20');
+                sidebar.classList.add('w-64');
+                document.querySelectorAll('.sidebar-text').forEach(el => el.classList.remove('hidden'));
+            } else {
+                sidebar.classList.remove('w-64');
+                sidebar.classList.add('w-20');
+                document.querySelectorAll('.sidebar-text').forEach(el => el.classList.add('hidden'));
+            }
+        }
+
+        function startNewChat() {
+            chatHistory = [];
+            currentSessionId = 'session_' + Date.now();
+            messageList.innerHTML = '';
+            messageList.classList.add('hidden');
+            welcomeScreen.classList.remove('hidden');
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            messageInput.focus();
+            renderHistorySidebar();
+        }
+
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    return hljs.highlight(code, { language: lang }).value;
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            langPrefix: 'hljs language-'
+        });
+
+        messageInput.addEventListener('input', () => {
+            messageInput.style.height = 'auto';
+            messageInput.style.height = `${Math.min(messageInput.scrollHeight, 120)}px`;
+        });
+
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                chatForm.dispatchEvent(new Event('submit'));
+            }
+        });
+
+        function sendQuickPrompt(text) {
+            messageInput.value = text;
+            chatForm.dispatchEvent(new Event('submit'));
+        }
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await sendMessage();
+        });
+
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text || isGenerating) return;
+
+            if (!currentSessionId || chatHistory.length === 0) {
+                currentSessionId = 'session_' + Date.now();
+                const sessionTitle = text.length > 24 ? text.substring(0, 24) + '...' : text;
+                allSessions.unshift({ id: currentSessionId, title: sessionTitle, history: chatHistory });
+            } else {
+                // Update judul sesi jika ini pesan pertama pada sesi tersebut
+                const session = allSessions.find(s => s.id === currentSessionId);
+                if (session && session.history.length === 0) {
+                    session.title = text.length > 24 ? text.substring(0, 24) + '...' : text;
+                }
+            }
+
+            welcomeScreen.classList.add('hidden');
+            messageList.classList.remove('hidden');
+
+            addMessage(text, 'user');
+            chatHistory.push({ role: 'user', content: text });
+            
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            
+            isGenerating = true;
+            sendBtn.disabled = true;
+            const typingElement = showTypingIndicator();
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages: chatHistory })
+                });
+
+                const data = await response.json();
+                removeTypingIndicator(typingElement);
+
+                if (response.ok && data.reply) {
+                    addMessage(data.reply, 'assistant');
+                    chatHistory.push({ role: 'assistant', content: data.reply });
+                } else {
+                    addMessage(`⚠️ Error: ${data.error || 'Gagal mendapat respon dari AI.'}`, 'assistant');
+                }
+            } catch (err) {
+                removeTypingIndicator(typingElement);
+                addMessage('⚠️ Error: Tidak dapat terhubung ke server Python.', 'assistant');
+            } finally {
+                isGenerating = false;
+                sendBtn.disabled = false;
+                messageInput.focus();
+                renderHistorySidebar();
+            }
+        }
+
+        function renderHistorySidebar() {
+            historyList.innerHTML = '';
+            allSessions.forEach(session => {
+                const item = document.createElement('div');
+                item.className = `history-item flex items-center justify-between text-sm text-slate-300 py-2 px-3 rounded-lg hover:bg-gemini-cardHover cursor-pointer transition ${session.id === currentSessionId ? 'bg-gemini-cardHover text-white font-medium' : ''}`;
+                
+                // Judul chat
+                const titleSpan = document.createElement('span');
+                titleSpan.className = 'truncate flex-1';
+                titleSpan.textContent = session.title;
+                titleSpan.onclick = () => loadSession(session.id);
+
+                // Tombol Hapus per item riwayat
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn opacity-0 p-1 text-slate-400 hover:text-red-400 transition ml-2 rounded';
+                deleteBtn.title = 'Hapus percakapan';
+                deleteBtn.innerHTML = `
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                `;
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation(); // Mencegah klik memicu loadSession
+                    deleteSession(session.id);
+                };
+
+                item.appendChild(titleSpan);
+                item.appendChild(deleteBtn);
+                historyList.appendChild(item);
+            });
+        }
+
+        function loadSession(sessionId) {
+            const session = allSessions.find(s => s.id === sessionId);
+            if (!session) return;
+
+            currentSessionId = session.id;
+            chatHistory = session.history;
+
+            messageList.innerHTML = '';
+            if (chatHistory.length > 0) {
+                welcomeScreen.classList.add('hidden');
+                messageList.classList.remove('hidden');
+                chatHistory.forEach(msg => {
+                    addMessage(msg.content, msg.role === 'user' ? 'user' : 'assistant');
+                });
+            } else {
+                startNewChat();
+            }
+            renderHistorySidebar();
+        }
+
+        function deleteSession(sessionId) {
+            allSessions = allSessions.filter(s => s.id !== sessionId);
+            
+            // Jika sesi yang sedang dibuka yang dihapus, reset ke chat baru
+            if (currentSessionId === sessionId) {
+                startNewChat();
+            } else {
+                renderHistorySidebar();
+            }
+        }
+
+        function clearAllHistory() {
+            if (confirm("Yakin ingin menghapus semua riwayat percakapan?")) {
+                allSessions = [];
+                startNewChat();
+            }
+        }
+
+        function addMessage(text, sender) {
+            const div = document.createElement('div');
+            
+            if (sender === 'user') {
+                div.className = 'flex justify-end';
+                div.innerHTML = `
+                    <div class="bg-gemini-card px-4 py-3 rounded-2xl rounded-tr-sm max-w-[85%] text-sm text-slate-100 shadow-sm whitespace-pre-wrap">
+                        ${escapeHtml(text)}
+                    </div>
+                `;
+            } else {
+                div.className = 'flex gap-4 items-start';
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'text-sm text-slate-300 leading-relaxed w-full space-y-2';
+                
+                contentDiv.innerHTML = marked.parse(text);
+
+                contentDiv.querySelectorAll('pre').forEach((preBlock) => {
+                    const codeText = preBlock.querySelector('code').innerText;
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'copy-code-btn';
+                    copyBtn.innerHTML = `<span>Salin</span>`;
+                    copyBtn.onclick = () => {
+                        navigator.clipboard.writeText(codeText).then(() => {
+                            copyBtn.innerHTML = `<span>Tersalin!</span>`;
+                            setTimeout(() => copyBtn.innerHTML = `<span>Salin</span>`, 2000);
+                        });
+                    };
+                    preBlock.appendChild(copyBtn);
+                });
+
+                div.innerHTML = `
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center shrink-0 font-bold text-xs text-white shadow-sm">NX</div>
+                `;
+                div.appendChild(contentDiv);
+            }
+
+            messageList.appendChild(div);
+            scrollToBottom();
+        }
+
+        function showTypingIndicator() {
+            const id = 'typing-' + Date.now();
+            const div = document.createElement('div');
+            div.id = id;
+            div.className = 'flex gap-4 items-start';
+            div.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center shrink-0 font-bold text-xs text-white shadow-sm">NX</div>
+                <div class="flex items-center gap-1.5 py-2">
+                    <span class="w-2 h-2 rounded-full bg-blue-400 animate-bounce"></span>
+                    <span class="w-2 h-2 rounded-full bg-purple-400 animate-bounce delay-100"></span>
+                    <span class="w-2 h-2 rounded-full bg-pink-400 animate-bounce delay-200"></span>
+                </div>
+            `;
+            messageList.appendChild(div);
+            scrollToBottom();
+            return id;
+        }
+
+        function removeTypingIndicator(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function scrollToBottom() {
+            const container = document.getElementById('chatContainer');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        startNewChat();
+    </script>
+</body>
+</html>
